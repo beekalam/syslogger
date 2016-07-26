@@ -1,0 +1,2 @@
+#!/bin/bash
+sudo twistd -y syslogger.tac
