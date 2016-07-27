@@ -4,7 +4,7 @@ import psycopg2
 import time
 from config import Config
 
-MAX_BULK_INSERT = 2000
+MAX_BULK_INSERT = 5
 queue_length = 0
 debug = True
 

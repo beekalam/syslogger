@@ -7,7 +7,7 @@ class Config:
 	def __init__(self):
 			self._ok_to_continue = True
 			try:
-				config  = self.parsefile('/etc/syslogger_daemon.conf')
+				config  = self.parsefile('./syslogger.conf')
 				self.configs = dict()
 				self._db_host = config.get('postgresql', 'host')
 				self._db_port = config.get('postgresql', 'port')
