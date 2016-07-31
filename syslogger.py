@@ -14,7 +14,6 @@ queue_length = 0
 debug = True
 
 
-
 def debug(msg):
     global debug
     if debug:
@@ -113,8 +112,8 @@ class Syslogger(protocol.DatagramProtocol):
     def datagramReceived(self, data, addr):
         ret = parse_message(data)
         if ret['parsed']:
-            login_time = str(datetime.now())
-            query_string = "INSERT INTO logs(method,action,url, source, login_time) VALUES ('{0}', '{1}', '{2}','{3}', '{4}') ".format(ret['method'], ret['action'], ret['url'], ret['ip'], login_time)
+            visited_at = str(datetime.now())
+            query_string = "INSERT INTO logs(method,action,url, source, visited_at) VALUES ('{0}', '{1}', '{2}','{3}', '{4}') ".format(ret['method'], ret['action'], ret['url'], ret['ip'], visited_at)
             self.querys.append(query_string)
             # insert_message_todb(query_string)
             if(len(self.querys) > MAX_BULK_INSERT):
@@ -123,6 +122,6 @@ class Syslogger(protocol.DatagramProtocol):
                 add_to_queue(len(self.querys))
                 self.querys = []
         #self.transport.write(data, send_to)
-# reactor.listenUDP(514, Syslogger())
-# reactor.run()
+reactor.listenUDP(514, Syslogger())
+reactor.run()
 
