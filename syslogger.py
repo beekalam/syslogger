@@ -105,6 +105,11 @@ def parse_message(data):
     
     return ret
 
+def make_query_string(method, action, url, source):
+    visited_at = str(datetime.now())
+    query_string = "INSERT INTO logs(method,action,url, source, visited_at) VALUES ('{0}', '{1}', '{2}','{3}', '{4}') ".format(method, action, url, ip, visited_at)
+    return query_string
+
 class Syslogger(protocol.DatagramProtocol):
     def __init__(self):
         self.querys = []
@@ -112,8 +117,7 @@ class Syslogger(protocol.DatagramProtocol):
     def datagramReceived(self, data, addr):
         ret = parse_message(data)
         if ret['parsed']:
-            visited_at = str(datetime.now())
-            query_string = "INSERT INTO logs(method,action,url, source, visited_at) VALUES ('{0}', '{1}', '{2}','{3}', '{4}') ".format(ret['method'], ret['action'], ret['url'], ret['ip'], visited_at)
+            query_string = make_query_string(ret['method'], ret['action'], ret['url'], ret['ip'])
             self.querys.append(query_string)
             # insert_message_todb(query_string)
             if(len(self.querys) > MAX_BULK_INSERT):
