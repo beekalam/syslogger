@@ -4,9 +4,15 @@ import psycopg2
 import time
 from config import Config
 
-MAX_BULK_INSERT = 5
+def get_max_bulk_insert():
+    cfg = Config()
+    return int(cfg.max_bulk_insert)
+
+MAX_BULK_INSERT = get_max_bulk_insert()
 queue_length = 0
 debug = True
+
+
 
 def debug(msg):
     global debug
@@ -36,10 +42,10 @@ def insert_message_todb(query_string):
             conn.commit()
             cur.close()
         except:
-            print("could not insert to database")
+            debug("could not insert to database")
         conn.close()
     except:
-        print("could not connect to database")
+        debug("could not connect to database")
 
 def insert_bulk_messages(query_string_list):
     bulk_size = len(query_string_list)
@@ -54,15 +60,15 @@ def insert_bulk_messages(query_string_list):
             conn.commit()
             cur.close()
         except:
-            print("could not insert into database")
+            debug("could not insert into database")
         conn.close()
     except:
-        print("could not insert into datbase")
+        debug("could not insert into datbase")
 
     time_taken = time.time() - start
-    debug("inserted {0} bulk messages in {1}".format(bulk_size, time_taken))
+    debug("inserted {0} bulk messages in {1} seconds".format(bulk_size, time_taken))
     add_to_queue(-(bulk_size))
-    debug("remaining records to insert: {0}".format(get_queue_size()))
+    debug("remaining records to insert: {0} seconds".format(get_queue_size()))
 
 def parse_message(data):
     ret= dict()
@@ -99,8 +105,6 @@ def parse_message(data):
     
     return ret
 
-
-
 class Syslogger(protocol.DatagramProtocol):
     def __init__(self):
         self.querys = []
@@ -117,7 +121,6 @@ class Syslogger(protocol.DatagramProtocol):
                 add_to_queue(len(self.querys))
                 self.querys = []
         #self.transport.write(data, send_to)
-
 # reactor.listenUDP(514, Syslogger())
 # reactor.run()
 

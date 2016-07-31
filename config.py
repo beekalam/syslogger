@@ -22,6 +22,8 @@ class Config:
 				self._pidfile = config.get('daemon', 'pidfile')
 
 				self._skip_extensions = config.get('daemon', 'skip-extensions')
+
+				self._max_bulk_insert = config.get('daemon', 'max_bulk_insert')
 			except ConfigParser.NoSectionError:
 				log("no section provided")
 				self._ok_to_continue = False
@@ -93,6 +95,10 @@ class Config:
 
 		return ret
 
+	@property
+	def max_bulk_insert(self):
+		return self._max_bulk_insert
+	
 	'''
 	def __str__(self):
 		attrs = {'db_host' : self.db_host, 'db_port' : self.db_port, 'db_user' : self.db_user, 'db_pass' : self.db_pass \
