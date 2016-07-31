@@ -1,7 +1,8 @@
 #!/usr/bin/env python
+from datetime import datetime
+import time
 from twisted.internet import reactor, threads, protocol
 import psycopg2
-import time
 from config import Config
 
 def get_max_bulk_insert():
@@ -112,7 +113,8 @@ class Syslogger(protocol.DatagramProtocol):
     def datagramReceived(self, data, addr):
         ret = parse_message(data)
         if ret['parsed']:
-            query_string = "INSERT INTO logs(method,action,url, source) VALUES ('{0}', '{1}', '{2}','{3}') ".format(ret['method'], ret['action'], ret['url'], ret['ip'])
+            login_time = str(datetime.now())
+            query_string = "INSERT INTO logs(method,action,url, source, login_time) VALUES ('{0}', '{1}', '{2}','{3}', '{4}') ".format(ret['method'], ret['action'], ret['url'], ret['ip'], login_time)
             self.querys.append(query_string)
             # insert_message_todb(query_string)
             if(len(self.querys) > MAX_BULK_INSERT):
