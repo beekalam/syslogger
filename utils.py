@@ -19,10 +19,14 @@ def parse_url(url):
 		last_section = path[path.rfind('/'):]
 		splitted = last_section.split('.')
 		if len(splitted) == 2:
-			ret['ext'] = splitted[1]
+			ext = splitted[1]
+			if ext in ['aspx','asp','php','jsp']:
+				ret['serverside_file_type'] = ext
+			else:
+				ret['file_ext'] = ext
 
 	if netloc:
-		ret['netloc'] = netloc
+		ret['domain'] = netloc
 	if query:
 		ret['query'] = query
 	if params:
@@ -30,3 +34,12 @@ def parse_url(url):
 
 	return ret
 
+if __name__ == '__main__':
+	url="http://www.google.com/a/b/c/d/a.php?i=1&j=1#fragment"
+	names = ''
+	values = ''
+	for (k,v) in  parse_url(url).items():
+		names += str(k)
+		values += str(v)
+	print names
+	print values

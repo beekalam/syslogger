@@ -4,6 +4,7 @@ import time
 from twisted.internet import reactor, threads, protocol
 import psycopg2
 from config import Config
+from utils import parse_url
 
 def get_max_bulk_insert():
     cfg = Config()
@@ -105,9 +106,15 @@ def parse_message(data):
     
     return ret
 
-def make_query_string(method, action, url, source):
-    visited_at = str(datetime.now())
-    query_string = "INSERT INTO logs(method,action,url, source, visited_at) VALUES ('{0}', '{1}', '{2}','{3}', '{4}') ".format(method, action, url, ip, visited_at)
+def make_query_string(method, action, url, source,visited_at):
+    names = "method, action, url, source, visited_at"
+    values = "'{0}', '{1}','{2}', '{3}', '{4}'".format(method, action, url, source,visited_at)
+    dic = parse_url(url)
+    for (k,v) in dic.items():
+        names += " ,{0}".format(k) 
+        values += " ,'{0}'".format(v)
+
+    query_string = "INSERT INTO logs({0}) values({1})".format(names, values);
     return query_string
 
 class Syslogger(protocol.DatagramProtocol):
@@ -115,9 +122,11 @@ class Syslogger(protocol.DatagramProtocol):
         self.querys = []
 
     def datagramReceived(self, data, addr):
+        visited_at = str(datetime.now())
         ret = parse_message(data)
         if ret['parsed']:
-            query_string = make_query_string(ret['method'], ret['action'], ret['url'], ret['ip'])
+            query_string = make_query_string(ret['method'], ret['action'], ret['url'], ret['ip'],visited_at)
+            # print query_string
             self.querys.append(query_string)
             # insert_message_todb(query_string)
             if(len(self.querys) > MAX_BULK_INSERT):
