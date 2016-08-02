@@ -135,6 +135,6 @@ class Syslogger(protocol.DatagramProtocol):
                 add_to_queue(len(self.querys))
                 self.querys = []
         #self.transport.write(data, send_to)
-reactor.listenUDP(514, Syslogger())
-reactor.run()
+# reactor.listenUDP(514, Syslogger())
+# reactor.run()
 
