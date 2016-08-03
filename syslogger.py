@@ -107,8 +107,7 @@ def parse_message(data):
     
     return ret
 
-def make_query_string(method, action, url, source,visited_at):
-    username = "user-test";
+def make_query_string(username,method, action, url, source,visited_at):
     names = "username, ip,url, visited_at"
     values = "'{0}', '{1}','{2}', '{3}' ".format(username, source,url,visited_at)
     # dic = parse_url(url)
@@ -120,44 +119,68 @@ def make_query_string(method, action, url, source,visited_at):
     return query_string
 
 class Syslogger(protocol.DatagramProtocol):
-    def __init__(self,actre, webre):
+    def __init__(self, webre, act_login, act_logout):
         self.querys = []
-        self.actre = actre
+        self.act_login = act_login
+        self.act_logout = act_logout
         self.webre = webre
+        self.users = dict()
+
+    def get_user_byname(self,username):
+        ret = None
+        for ip, name in self.users.items():
+            if name == username:
+                ret = ip
+                break
+        return ret
 
     def datagramReceived(self, data, addr):
         visited_at = str(datetime.now())
-        act_match = self.actre.search(data)
+        actlogin_match = self.act_login.search(data)
+        actlogout_match = self.act_logout.search(data)
         web_match = self.webre.search(data)
-        print("+++++++++++++++++++++++++++++++++++++++++")
+        debug("+++++++++++++++++++++++++++++++++++++++++")
+        debug("received data: '%s'" % data)
 
-        if act_match:
-            print ("-----------------------accounting match-----------------")
-        print("received data: '%s'" % data)
-        if web_match:
-            print("--------------- webmatch -----------------")
+        if actlogin_match:
+            debug ("-----------------------accounting login match-----------------")
+            mg = actlogin_match.groups()
+            username, ip = mg[0], mg[1]
+            if not (ip in self.users):
+                self.users[ip] = username
+
+        elif actlogout_match:
+            debug("-----------------------accounting logout match-------------")
+            username = actlogout_match.groups()[0]
+            ip = self.get_user_byname(username)
+            if ip:
+                try:
+                    del self.users[ip]
+                except KeyError:
+                    pass
+
+        elif web_match:
+            debug("--------------- webmatch ---------------------------------")
             matches  = web_match.groups()
             ip = matches[0]
             method = matches[1]
             url = matches[2]
             action =matches[3]
             cach = matches[4]
-            query_string = make_query_string(method, action, url, ip,visited_at)
-            print (query_string)
-            # print query_string
-            self.querys.append(query_string)
-            # insert_message_todb(query_string)
-            if(len(self.querys) > MAX_BULK_INSERT):
-                copy = self.querys[:]
-                # threads.deferToThread(insert_bulk_messages, copy)
-                add_to_queue(len(self.querys))
-                self.querys = []
-        #self.transport.write(data, send_to)
+            if ip in self.users:
+                username = self.users[ip]
+                query_string = make_query_string(username,method, action, url, ip,visited_at)
+                self.querys.append(query_string)
+                if(len(self.querys) > MAX_BULK_INSERT):
+                    copy = self.querys[:]
+                    threads.deferToThread(insert_bulk_messages, copy)
+                    add_to_queue(len(self.querys))
+                    self.querys = []
 
-MAX_BULK_INSERT = 1
-actre = re.compile(r'act===>: (\w+) logged in, (\d+.\d+.\d+.\d+)')
+act_login = re.compile(r'act===>: (\w+) logged in, (\d+.\d+.\d+.\d+)')
+act_logout = re.compile(r'act===>: (\w+) logged out, ')
 webre = re.compile(r'web===>: (\d+.\d+.\d+.\d+) (\w+) (.+) action=(\w+) cache=(\w+)')
 
-reactor.listenUDP(514, Syslogger(actre, webre))
+reactor.listenUDP(514, Syslogger(webre, act_login, act_logout))
 reactor.run()
 
