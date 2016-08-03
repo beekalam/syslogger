@@ -72,41 +72,6 @@ def insert_bulk_messages(query_string_list):
     add_to_queue(-(bulk_size))
     debug("remaining records to insert: {0} seconds".format(get_queue_size()))
 
-def parse_message(data):
-    ret= dict()
-    ret['parsed'] = True
-
-    if not data:
-        ret['parsed'] = False
-        return ret
-
-    data_split = data.split()
-    if not data_split[1]:
-        ret['parsed'] = False
-        return
-
-    ret['ip'] = data_split[1]
-
-    if not data_split[2]:
-        ret['parsed'] = False
-        return ret
-
-    ret['method'] = data_split[2]
-
-    if not data_split[3]:
-        ret['parsed'] = False
-        return ret
-
-    ret['url'] = data_split[3]
-
-    if not data_split[4] or (not data_split[4].split('=')[1]):
-        ret['parsed'] = False
-        return ret
-
-    ret['action'] = data_split[4].split('=')[1]
-    
-    return ret
-
 def make_query_string(username,method, action, url, source,visited_at):
     names = "username, ip,url, visited_at"
     values = "'{0}', '{1}','{2}', '{3}' ".format(username, source,url,visited_at)
