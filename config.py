@@ -1,7 +1,7 @@
 import ConfigParser
 import io
 import traceback
-from utils import log
+#from utils import log
 
 class Config:
 	def __init__(self):
@@ -25,16 +25,16 @@ class Config:
 
 				self._max_bulk_insert = config.get('daemon', 'max_bulk_insert')
 			except ConfigParser.NoSectionError:
-				log("no section provided")
+				print("no section provided")
 				self._ok_to_continue = False
 			except ConfigParser.DuplicateSectionError:
-				log("duplicate sections")
+				print("duplicate sections")
 				self._ok_to_continue = False
 			except ConfigParser.NoOptionError:
-				log("no option error")
+				print("no option error")
 				self._ok_to_continue = False
 			except ConfigParser.ParsingError:
-				log("parsing error")
+				print("parsing error")
 				self._ok_to_continue = False
 
 	def ok_to_continue(self):
