@@ -142,7 +142,7 @@ class Syslogger(protocol.DatagramProtocol):
                 self.nases[nas_ip]["status"] = NOT_CHECKED_YET
 
     def skip_url(self, url):
-        #return if there are no rules get back ASAP
+        #if there are no rules get back ASAP
         # if not self.has_rules:
             # return False
 
@@ -155,8 +155,11 @@ class Syslogger(protocol.DatagramProtocol):
 
         if 'by_domain' in self.exclusion_rules:
             if 'domain' in parsed_url:
-                if parsed_url['domain'] in self.exclusion_rules['by_domain']:
-                    # fixme: strip www from domains first
+                domain = parsed_url['domain'].lower()
+                if domain.startswith('www.'):
+                    domain = domain[len('www.'):]
+                if domain in self.exclusion_rules['by_domain']:
+                    print("===[SKIP]: {0}".format(url))
                     return True
         return False
 
@@ -216,12 +219,11 @@ class Syslogger(protocol.DatagramProtocol):
             action =matches[3]
             cache = matches[4]
             ok_to_continue = True
-            print(url)
+            # print(url)
             if self.skip_url(url):
-                print("[skip]===>{0}".format(url))
                 return
             # ok_to_continue = (not self.filter_url(url)) and (ip in self.nases[nas_ip]["users"])
-            print("--------")
+            # print(80 * '-')
 
             if ip in self.nases[nas_ip]["users"]:
                 username = self.nases[nas_ip]["users"][ip]

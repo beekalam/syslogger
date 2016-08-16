@@ -141,9 +141,14 @@ def load_exclusion_rules():
 			for exclusion_rule in cur:
 				exclusion_name, exclusion_value = exclusion_rule[EXCLUSION_NAME], exclusion_rule[EXCLUSION_VALUE]
 				if exclusion_name == 'by_ext':
+					#fixme: should we check for empty values if any?
 					ret['by_ext'].append(str(exclusion_value))
 				elif exclusion_name == 'by_domain':
-					ret['by_domain'].append(str(exclusion_value))
+					#fixme: should we check for empty values if any?
+					domain = str(exclusion_value).lower()
+					if domain.startswith('www.'):
+						domain = domain[len('www.'):]
+					ret['by_domain'].append(domain)
 		except psycopg2.Error as e:
 			print("could not load exclusion rules: {0},{1}".format(e.pgcode or "" , e.pgerror or ""))
 		finally:
@@ -152,6 +157,11 @@ def load_exclusion_rules():
 	except psycopg2.Error as e:
 		print('error connecting to database: {0}, {1}'.format(e.pgcode or "", e.pgerror or ""))
 
+	#remove empty rules
+	if len(ret['by_ext']) == 0:
+		del ret['by_ext']
+	if len(ret['by_domain']) == 0:
+		del ret['by_domain']
 	return ret
 
 def test_load_exclusion_rules():

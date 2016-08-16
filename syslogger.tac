@@ -13,6 +13,7 @@ if not can_connect_todb():
 	sys.exit()
 print("connection to database: OK")
 
+# fixme: check for at least one nas in the datbase & if there is not one exit
 # load exclusion rules
 exclusion_rules = load_exclusion_rules()
 
