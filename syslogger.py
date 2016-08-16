@@ -68,11 +68,9 @@ def make_query_string(nas_ip, username,method, action, url, source,visited_at):
     # debug(query_string)
     return query_string
 
-CHECKING, CHECKED, NOT_CHECKED_YET = 0, 1, 2
-
-class Syslogger(protocol.DatagramProtocol):
-
-    def __init__(self, webre, act_login, act_logout,nases,exclusion_rules):
+class BaseSyslogger(protocol.DatagramProtocol):
+    CHECKING, CHECKED, NOT_CHECKED_YET = 0, 1, 2
+    def __init__(self,webre, act_login, act_logout,nases,exclusion_rules):
         self.packet_count = 0
         self.querys = []
         self.act_login = act_login
@@ -89,7 +87,7 @@ class Syslogger(protocol.DatagramProtocol):
             self.nases[nas_ip] = {}
             self.nases[nas_ip]["username"] = username
             self.nases[nas_ip]["password"] = password
-            self.nases[nas_ip]["status"] = NOT_CHECKED_YET
+            self.nases[nas_ip]["status"] = self.NOT_CHECKED_YET
         print ("in syslogerr __init__: {0}".format(self.nases))
         print ("in sysloggger __init__: {0}".format(self.exclusion_rules))
 
@@ -100,6 +98,31 @@ class Syslogger(protocol.DatagramProtocol):
                 ret = ip
                 break
         return ret
+
+    def on_nas_users_received(self, ip_user):
+        nas_ip = ip_user[0]
+        nas_users =ip_user[1]
+        # self.nases[nas_ip]["users"] = dict()
+        for (ip,user) in nas_users:
+            self.nases[nas_ip]["users"][ip] = user
+        self.nases[nas_ip]["status"] = self.CHECKED
+        print self.nases[nas_ip]["users"]
+
+
+    def check_for_new_nases(self):
+        nases = get_naslist_from_db()
+        for nas_ip,username, password in nases:
+            if not (nas_ip in self.nases):
+                self.nases[nas_ip] = {}
+                self.nases[nas_ip]["username"] = username
+                self.nases[nas_ip]["password"] = password
+                self.nases[nas_ip]["status"] = self.NOT_CHECKED_YET
+
+    def print_nase(self):
+        print(80 * '+')
+        for nas_ip in self.nases:
+            for ip,user in self.nases[nas_ip]["users"].items():
+                print ("nas_ip:{0}, ip: {1}, user:{2}".format(nas_ip, ip ,user) )
 
     def get_nas_users(self, nas_ip, user, password):
         ret = []
@@ -117,29 +140,10 @@ class Syslogger(protocol.DatagramProtocol):
             s.close()
         return (nas_ip,ret)
 
-    def on_nas_users_received(self, ip_user):
-        nas_ip = ip_user[0]
-        nas_users =ip_user[1]
-        # self.nases[nas_ip]["users"] = dict()
-        for (ip,user) in nas_users:
-            self.nases[nas_ip]["users"][ip] = user
-        self.nases[nas_ip]["status"] = CHECKED
-        print self.nases[nas_ip]["users"]
+class Syslogger(BaseSyslogger):
 
-    def print_nase(self):
-        print(80 * '+')
-        for nas_ip in self.nases:
-            for ip,user in self.nases[nas_ip]["users"].items():
-                print ("nas_ip:{0}, ip: {1}, user:{2}".format(nas_ip, ip ,user) )
-
-    def check_for_new_nases(self):
-        nases = get_naslist_from_db()
-        for nas_ip,username, password in nases:
-            if not (nas_ip in self.nases):
-                self.nases[nas_ip] = {}
-                self.nases[nas_ip]["username"] = username
-                self.nases[nas_ip]["password"] = password
-                self.nases[nas_ip]["status"] = NOT_CHECKED_YET
+    def __init__(self, webre, act_login, act_logout,nases,exclusion_rules):
+        BaseSyslogger.__init__(self,webre, act_login, act_logout,nases,exclusion_rules)
 
     def skip_url(self, url):
         #if there are no rules get back ASAP
@@ -151,6 +155,7 @@ class Syslogger(protocol.DatagramProtocol):
         if 'by_ext' in self.exclusion_rules:
             if 'file_ext' in parsed_url:
                 if parsed_url['file_ext'] in self.exclusion_rules['by_ext']:
+                    print("===[SKIP]: {0}".format(url))
                     return True
 
         if 'by_domain' in self.exclusion_rules:
@@ -175,14 +180,14 @@ class Syslogger(protocol.DatagramProtocol):
             r = threads.deferToThread(self.check_for_new_nases)
             self.packet_count = 0
         # if it's the first time receiving from nas_ip load its users
-        if self.nases[nas_ip]["status"] == NOT_CHECKED_YET:
-            self.nases[nas_ip]["status"] = CHECKING
+        if self.nases[nas_ip]["status"] == self.NOT_CHECKED_YET:
+            self.nases[nas_ip]["status"] = self.CHECKING
             self.nases[nas_ip]["users"] = {}
             d = threads.deferToThread(self.get_nas_users ,nas_ip, self.nases[nas_ip]["username"], self.nases[nas_ip]["password"])
             d.addCallback(self.on_nas_users_received)
             # fixme: we should skip the packet here how?
         # if getting nas users still in progress skip packets
-        elif self.nases[nas_ip]["status"] == CHECKING:
+        elif self.nases[nas_ip]["status"] == self.CHECKING:
             return
 
         visited_at = str(datetime.datetime.now())
@@ -219,7 +224,7 @@ class Syslogger(protocol.DatagramProtocol):
             action =matches[3]
             cache = matches[4]
             ok_to_continue = True
-            # print(url)
+            print("===[URL]:{0}".format(url))
             if self.skip_url(url):
                 return
             # ok_to_continue = (not self.filter_url(url)) and (ip in self.nases[nas_ip]["users"])
