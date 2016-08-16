@@ -12,6 +12,19 @@ def make_connection_string():
 def log(to_log=""):
 	syslog.syslog("[syslogger] " + to_log)
 
+def get_url_extension(url):
+	ret = None
+	url_parsed  = urlparse(url)
+	PATH = 2
+	path = url_parsed[PATH]
+	if path:
+		last_section = path[path.rfind('/'):]
+		splitted = last_section.split('.')
+		if len(splitted) == 2:
+			ret = splitted[1]
+
+	return ret
+
 def parse_url(url):
 	ret = dict()
 	url_parsed = urlparse(url)
@@ -26,8 +39,8 @@ def parse_url(url):
 		ret['path'] = path
 		last_section = path[path.rfind('/'):]
 		splitted = last_section.split('.')
-		if len(splitted) == 2:
-			ext = splitted[1]
+		if len(splitted)>=2:
+			ext = splitted[-1].strip().lower()
 			if ext in ['aspx','asp','php','jsp']:
 				ret['serverside_file_type'] = ext
 			else:
@@ -114,12 +127,35 @@ def insert_message_todb(query_string):
 	except:
 		debug("could not connect to database")
 
+def load_exclusion_rules():
+	ret = {}
+	ret['by_ext'] = []
+	ret['by_domain'] = []
+	EXCLUSION_NAME, EXCLUSION_VALUE = 1, 2
+	try:
+		connection_string = make_connection_string()
+		conn = psycopg2.connect(connection_string)
+		cur = conn.cursor()
+		try:
+			cur.execute("SELECT * FROM exclusion_rules")
+			for exclusion_rule in cur:
+				exclusion_name, exclusion_value = exclusion_rule[EXCLUSION_NAME], exclusion_rule[EXCLUSION_VALUE]
+				if exclusion_name == 'by_ext':
+					ret['by_ext'].append(str(exclusion_value))
+				elif exclusion_name == 'by_domain':
+					ret['by_domain'].append(str(exclusion_value))
+		except psycopg2.Error as e:
+			print("could not load exclusion rules: {0},{1}".format(e.pgcode or "" , e.pgerror or ""))
+		finally:
+			cur.close()
+			conn.close()
+	except psycopg2.Error as e:
+		print('error connecting to database: {0}, {1}'.format(e.pgcode or "", e.pgerror or ""))
+
+	return ret
+
+def test_load_exclusion_rules():
+	print load_exclusion_rules()
+
 if __name__ == '__main__':
-	url="http://www.google.com/a/b/c/d/a.php?i=1&j=1#fragment"
-	names = ''
-	values = ''
-	for (k,v) in  parse_url(url).items():
-		names += str(k)
-		values += str(v)
-	print names
-	print values
+	test_load_exclusion_rules()

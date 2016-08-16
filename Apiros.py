@@ -155,9 +155,6 @@ class ApiRos:
 def get_nas_users(ip, user, password):
     ret = []
     try:
-        ip = '172.16.25.132'
-        user = 'weblizer'
-        password ='sina$$'
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((ip, 8728))
         apiros = ApiRos(s);
@@ -172,9 +169,9 @@ def get_nas_users(ip, user, password):
 
 
 def main():
-        ip = '172.16.25.132'
-        user = 'weblizer'
-        password ='sina$$'
+        ip = '94.74.128.14'
+        user = 'mansouri'
+        password ='159357'
         print get_nas_users(ip, user, password)
 
 if __name__ == '__main__':
