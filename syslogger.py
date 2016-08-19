@@ -1,15 +1,14 @@
-#!/usr/bin/env python
+        #!/usr/bin/env python
 import datetime
 import time
 import re
-import socket
 import sys
 from twisted.internet import reactor, threads, protocol
 import psycopg2 
 from config import Config
 from utils import parse_url,make_connection_string
 from utils import get_naslist_from_db
-from Apiros import ApiRos, ApiRosException
+from nasmanager import NasManager
 
 def get_max_bulk_insert():
     cfg = Config()
@@ -17,7 +16,7 @@ def get_max_bulk_insert():
 
 MAX_BULK_INSERT = get_max_bulk_insert()
 queue_length = 0
-debug = False
+debug = True
 
 def debug(msg):
     global debug
@@ -42,6 +41,7 @@ def insert_bulk_messages(query_string_list):
         try:
             for item in query_string_list:
                 cur.execute(item.strip())
+                print("===[DB] inserting {0} ".format(item[0:80]))
             conn.commit()
         except psycopg2.Error as e:
             print("could not insert into database:{0}, {1}".format( e.pgcode or "", e.pgerror or ""))
@@ -68,8 +68,9 @@ def make_query_string(nas_ip, username,method, action, url, source,visited_at):
     # debug(query_string)
     return query_string
 
+
 class BaseSyslogger(protocol.DatagramProtocol):
-    CHECKING, CHECKED, NOT_CHECKED_YET = 0, 1, 2
+    
     def __init__(self,webre, act_login, act_logout,nases,exclusion_rules):
         self.packet_count = 0
         self.querys = []
@@ -82,32 +83,8 @@ class BaseSyslogger(protocol.DatagramProtocol):
             if len(self.exclusion_rules[key]) > 0:
                 self.has_rules = True
 
-        self.nases = {}
-        for nas_ip,username, password in nases:
-            self.nases[nas_ip] = {}
-            self.nases[nas_ip]["username"] = username
-            self.nases[nas_ip]["password"] = password
-            self.nases[nas_ip]["status"] = self.NOT_CHECKED_YET
-        print ("in syslogerr __init__: {0}".format(self.nases))
-        print ("in sysloggger __init__: {0}".format(self.exclusion_rules))
-
-    def get_ip_byname(self,nas_ip, username):
-        ret = None
-        for ip, name in self.nases[nas_ip]["users"].items():
-            if name == username:
-                ret = ip
-                break
-        return ret
-
-    def on_nas_users_received(self, ip_user):
-        nas_ip = ip_user[0]
-        nas_users =ip_user[1]
-        # self.nases[nas_ip]["users"] = dict()
-        for (ip,user) in nas_users:
-            self.nases[nas_ip]["users"][ip] = user
-        self.nases[nas_ip]["status"] = self.CHECKED
-        print self.nases[nas_ip]["users"]
-
+        self.nm = NasManager()
+        self.nm.add_nases(nases)
 
     def check_for_new_nases(self):
         nases = get_naslist_from_db()
@@ -123,22 +100,6 @@ class BaseSyslogger(protocol.DatagramProtocol):
         for nas_ip in self.nases:
             for ip,user in self.nases[nas_ip]["users"].items():
                 print ("nas_ip:{0}, ip: {1}, user:{2}".format(nas_ip, ip ,user) )
-
-    def get_nas_users(self, nas_ip, user, password):
-        ret = []
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            s.connect((nas_ip, 8728))
-            apiros = ApiRos(s);
-            apiros.login(user, password)
-            ret = apiros.get_active_radius_users()
-        except ApiRosException:
-            print("could not connect to api on nas:{0}".format(nas_ip))
-        except socket.error:
-            print("socket errror on connecting to:{0}".format(nas_ip))
-        finally:
-            s.close()
-        return (nas_ip,ret)
 
 class Syslogger(BaseSyslogger):
 
@@ -172,23 +133,25 @@ class Syslogger(BaseSyslogger):
         self.packet_count += 1
 
         nas_ip = addr[0]
+        if self.nm.skip_nas(nas_ip):
+            return
         # reject packet which is not in our nases
-        if not (nas_ip in self.nases):
-            return
+        # if not (nas_ip in self.nases):
+            # return
         # check for new nases from databases
-        if self.packet_count > 2000:
-            r = threads.deferToThread(self.check_for_new_nases)
-            self.packet_count = 0
+        # if self.packet_count > 2000:
+            # r = threads.deferToThread(self.check_for_new_nases)
+            # self.packet_count = 0
         # if it's the first time receiving from nas_ip load its users
-        if self.nases[nas_ip]["status"] == self.NOT_CHECKED_YET:
-            self.nases[nas_ip]["status"] = self.CHECKING
-            self.nases[nas_ip]["users"] = {}
-            d = threads.deferToThread(self.get_nas_users ,nas_ip, self.nases[nas_ip]["username"], self.nases[nas_ip]["password"])
-            d.addCallback(self.on_nas_users_received)
-            # fixme: we should skip the packet here how?
+        # if self.nases[nas_ip]["status"] == self.NOT_CHECKED_YET:
+        #     self.nases[nas_ip]["status"] = self.CHECKING
+        #     self.nases[nas_ip]["users"] = {}
+        #     d = threads.deferToThread(self.get_nas_users ,nas_ip, self.nases[nas_ip]["username"], self.nases[nas_ip]["password"])
+        #     d.addCallback(self.on_nas_users_received)
+        #     fixme: we should skip the packet here how?
         # if getting nas users still in progress skip packets
-        elif self.nases[nas_ip]["status"] == self.CHECKING:
-            return
+        # elif self.nases[nas_ip]["status"] == self.CHECKING:
+        #     return
 
         visited_at = str(datetime.datetime.now())
         actlogin_match = self.act_login.search(data)
@@ -202,18 +165,20 @@ class Syslogger(BaseSyslogger):
             #debug ("-----------------------accounting login match-----------------")
             mg = actlogin_match.groups()
             username, ip = mg[0], mg[1]
-            if not (ip in self.nases[nas_ip]["users"]):
-                self.nases[nas_ip]["users"][ip] = username
+            self.nm.login_user(nas_ip, ip, username)
+            # if not (ip in self.nases[nas_ip]["users"]):
+                # self.nases[nas_ip]["users"][ip] = username
 
         elif actlogout_match:
             #debug("-----------------------accounting logout match-------------")
             username = actlogout_match.groups()[0]
-            ip = self.get_ip_byname(nas_ip, username)
-            if ip:
-                try:
-                    del self.nases[nas_ip]["users"][ip]
-                except KeyError:
-                    print("error deleting user")
+            self.nm.logout_user(nas_ip,username)
+            # ip = self.get_ip_byname(nas_ip, username)
+            # if ip:
+            #     try:
+            #         del self.nases[nas_ip]["users"][ip]
+            #     except KeyError:
+            #         print("error deleting user")
 
         elif web_match:
             #debug("--------------- webmatch ---------------------------------")
@@ -223,15 +188,17 @@ class Syslogger(BaseSyslogger):
             url = matches[2]
             action =matches[3]
             cache = matches[4]
-            ok_to_continue = True
+            # ok_to_continue = True
             print("===[URL]:{0}".format(url))
-            if self.skip_url(url):
-                return
+            # if self.skip_url(url):
+                # return
             # ok_to_continue = (not self.filter_url(url)) and (ip in self.nases[nas_ip]["users"])
             # print(80 * '-')
 
-            if ip in self.nases[nas_ip]["users"]:
-                username = self.nases[nas_ip]["users"][ip]
+            # if ip in self.nases[nas_ip]["users"]:
+            if self.nm.has_ip(nas_ip, ip):
+                # username = self.nases[nas_ip]["users"][ip]
+                username = self.nm.get_username(nas_ip, ip)
                 query_string = make_query_string(nas_ip, username,method, action, url, ip,visited_at)
                 # print("nas_ip:{0}, ip:{1}, username:{2},url:{3}".format(nas_ip, ip, username, url))
                 self.querys.append(query_string)
