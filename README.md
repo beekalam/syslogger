@@ -64,4 +64,8 @@ make a `syslogger_php.conf` in `/etc/init/` and add the following lines:
 ### SysV (aka init.d)
 
 
+### query for cleaning up the database
+
+delete from weblogs where weblog_id in (select weblog_id from weblogs where to_timestamp(visited_at) < NOW() - INTERVAL '30 days')
+
 
