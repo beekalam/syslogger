@@ -75,3 +75,6 @@ WITH (
 );
 ALTER TABLE exclusion_rules
   OWNER TO postgres;
+
+-- added by ashkan
+CREATE UNIQUE INDEX weblog_id_idx ON weblogs (weblog_id);
