@@ -1,5 +1,38 @@
-startup
-====
+intro
+============
+`syslogger` is a service for collecting user web visits from `Mikrotik`
+logs.
+It can accept logs from multiple `NASES`.
+
+
+installation
+===========================
+
+# requirements
+- postgresql
+- python 2.7
+
+# library installations
+- install `psycopg2`
+```
+$ sudo apt-get install python-psycopg2
+```
+
+- install twisted
+```
+sudo apt-get install python-twisted-core
+```
+
+# database
+database schema is at `db.sql`
+
+Running
+==================
+
+use `syslogger_start`  and `syslogger_stop` to start and stop logger script manually
+
+Create Startup loader for ubuntu 16.04
+==========================
 
 Here is  some documentation on making a startup script for `syslogger`. There are different variations on making
 a startup script:
